@@ -8,7 +8,9 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/pacificbelt30/codex-dock/internal/networkpolicy"
 )
@@ -177,6 +179,119 @@ func TestWorkerFacingHandler_AuthRejectsForward(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/responses", nil))
 	if !muxHit {
 		t.Error("origin-form should reach the mux on the auth proxy")
+	}
+}
+
+func TestProxyListenersKeepCredentialAndForwardingRolesSeparate(t *testing.T) {
+	const key = "fixture-openai-key"
+	const adminSecret = "fixture-admin-secret-for-listener-test"
+	var authRequests, egressRequests atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/models":
+			authRequests.Add(1)
+			if r.Header.Get("Authorization") != "Bearer "+key {
+				t.Error("fixed AI route did not inject its upstream credential")
+			}
+		case "/ordinary":
+			egressRequests.Add(1)
+			if r.Header.Get("Authorization") != "Bearer ordinary-fixture" || r.Header.Get("Proxy-Authorization") != "" {
+				t.Error("general forwarding did not preserve the destination credential or strip proxy authentication")
+			}
+		default:
+			t.Errorf("unexpected upstream request: %s", r.URL.Path)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(upstream.Close)
+
+	auth, err := NewProxy(Config{Role: RoleAuth, ListenAddr: "127.0.0.1:0", AdminListenAddr: "127.0.0.1:0", AdminSecret: adminSecret})
+	if err != nil {
+		t.Fatal(err)
+	}
+	auth.apiKey, auth.apiUpstreamURL = key, upstream.URL
+	if err := auth.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(auth.Stop)
+
+	egress, err := NewProxy(Config{
+		Role:          RoleEgress,
+		ListenAddr:    "127.0.0.1:0",
+		ForwardPolicy: networkpolicy.Rules{DefaultDeny: true, AllowCIDRs: []string{"127.0.0.1/32"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := egress.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(egress.Stop)
+
+	token := issuedTestToken(t, auth)
+	direct := &http.Client{Timeout: 4 * time.Second}
+	check := func(t *testing.T, client *http.Client, method, endpoint, authorization string, want int) {
+		t.Helper()
+		r, err := http.NewRequestWithContext(t.Context(), method, endpoint, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		r.Header.Set("Authorization", authorization)
+		if r.URL.Path == "/admin/mode" {
+			r.Header.Set("X-Proxy-Admin-Secret", adminSecret)
+		}
+		resp, err := client.Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != want {
+			t.Fatalf("%s %s returned %d, want %d", method, r.URL.Path, resp.StatusCode, want)
+		}
+	}
+	t.Run("management listener", func(t *testing.T) {
+		check(t, direct, http.MethodGet, "http://"+auth.adminAddr+"/admin/mode", "", http.StatusOK)
+		check(t, direct, http.MethodGet, auth.Endpoint()+"/admin/mode", "", http.StatusNotFound)
+	})
+	t.Run("forwarding listeners", func(t *testing.T) {
+		for _, p := range []*Proxy{auth, egress} {
+			proxyURL, err := url.Parse(p.Endpoint())
+			if err != nil {
+				t.Fatal(err)
+			}
+			proxyURL.User = url.UserPassword("fixture-proxy-user", "fixture-proxy-password")
+			transport := &http.Transport{Proxy: http.ProxyURL(proxyURL)}
+			t.Cleanup(transport.CloseIdleConnections)
+			client := &http.Client{Transport: transport, Timeout: 4 * time.Second}
+			want := http.StatusNoContent
+			if p == auth {
+				want = http.StatusMethodNotAllowed
+			}
+			check(t, client, http.MethodGet, upstream.URL+"/ordinary", "Bearer ordinary-fixture", want)
+		}
+	})
+	t.Run("worker listeners", func(t *testing.T) {
+		check(t, direct, http.MethodGet, auth.Endpoint()+"/v1/models", "Bearer "+token, http.StatusNoContent)
+		for _, route := range []struct{ method, path string }{
+			{http.MethodGet, "/v1/models"},
+			{http.MethodGet, "/chatgpt/codex/models"},
+			{http.MethodPost, "/anthropic/v1/messages"},
+			{http.MethodPost, "/oauth/token"},
+			{http.MethodPost, "/token"},
+			{http.MethodPost, "/revoke"},
+			{http.MethodGet, "/broker/service/v1/read"},
+			{http.MethodGet, "/admin/mode"},
+		} {
+			t.Run(route.path, func(t *testing.T) {
+				check(t, direct, route.method, egress.Endpoint()+route.path, "Bearer "+token, http.StatusNotFound)
+			})
+		}
+	})
+	if got := authRequests.Load(); got != 1 {
+		t.Errorf("AI upstream received %d requests, want 1", got)
+	}
+	if got := egressRequests.Load(); got != 1 {
+		t.Errorf("ordinary upstream received %d requests, want 1", got)
 	}
 }
 

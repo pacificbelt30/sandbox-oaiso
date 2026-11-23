@@ -4,9 +4,8 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"github.com/pacificbelt30/codex-dock/internal/egresscontrol"
-	"github.com/pacificbelt30/codex-dock/internal/networkpolicy"
 	"io"
 	"net"
 	"net/http"
@@ -17,14 +16,24 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/pacificbelt30/codex-dock/internal/egresscontrol"
+	"github.com/pacificbelt30/codex-dock/internal/networkpolicy"
 )
 
 func TestLiveEgressClosesHTTPAndCONNECTPersistsAndRejectsStaleUpdates(t *testing.T) {
+	upstreamClosed := make(chan string, 2)
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/http-stream" && r.URL.Path != "/connect-stream" {
+			t.Errorf("unexpected request reached upstream: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 		w.Header().Set("Content-Type", "text/event-stream")
 		_, _ = io.WriteString(w, "data: ready\n\n")
 		w.(http.Flusher).Flush()
 		<-r.Context().Done()
+		upstreamClosed <- r.URL.Path
 	}))
 	defer backend.Close()
 	backendURL, _ := url.Parse(backend.URL)
@@ -66,8 +75,8 @@ func TestLiveEgressClosesHTTPAndCONNECTPersistsAndRejectsStaleUpdates(t *testing
 	endpoint, _ := url.Parse(p.Endpoint())
 	transport := &http.Transport{Proxy: http.ProxyURL(endpoint)}
 	defer transport.CloseIdleConnections()
-	client := &http.Client{Transport: transport, Timeout: 4 * time.Second}
-	resp, err := client.Get("http://8.8.8.8/stream")
+	client := &http.Client{Transport: transport, Timeout: 15 * time.Second}
+	resp, err := client.Get("http://8.8.8.8/http-stream")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,13 +98,16 @@ func TestLiveEgressClosesHTTPAndCONNECTPersistsAndRejectsStaleUpdates(t *testing
 		t.Fatal("CONNECT failed", err)
 	}
 	defer func() { _ = connectResp.Body.Close() }()
-	_, _ = fmt.Fprint(tunnel, "GET /stream HTTP/1.1\r\nHost: 8.8.8.8\r\n\r\n")
+	_, _ = fmt.Fprint(tunnel, "GET /connect-stream HTTP/1.1\r\nHost: 8.8.8.8\r\n\r\n")
 	stream, err := http.ReadResponse(reader, &http.Request{Method: "GET"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer stream.Body.Close()
 	if _, err = io.ReadFull(stream.Body, buf); err != nil {
+		t.Fatal(err)
+	}
+	if err := tunnel.SetDeadline(time.Time{}); err != nil {
 		t.Fatal(err)
 	}
 	// Each control call has its own client timeout. A shared five-second
@@ -110,11 +122,32 @@ func TestLiveEgressClosesHTTPAndCONNECTPersistsAndRejectsStaleUpdates(t *testing
 	if err != nil || !state.Ready || state.Generation != 2 {
 		t.Fatal(state, err)
 	}
-	if _, err = resp.Body.Read(buf); err == nil {
-		t.Fatal("HTTP stream survived policy update")
+	waitCtx, cancel := context.WithTimeout(ctx, 4*time.Second)
+	defer cancel()
+	wantClosed := map[string]bool{"/http-stream": true, "/connect-stream": true}
+	for range 2 {
+		select {
+		case path := <-upstreamClosed:
+			delete(wantClosed, path)
+		case <-waitCtx.Done():
+			t.Fatalf("upstream streams still open after policy update: %v", wantClosed)
+		}
 	}
-	if _, err = stream.Body.Read(buf); err == nil {
-		t.Fatal("CONNECT stream survived policy update")
+	if len(wantClosed) != 0 {
+		t.Fatalf("missing upstream closure: %v", wantClosed)
+	}
+	if err := tunnel.SetReadDeadline(time.Now().Add(4 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	for _, connection := range []struct {
+		name string
+		body io.Reader
+	}{{"HTTP", resp.Body}, {"CONNECT", stream.Body}} {
+		n, err := connection.body.Read(buf)
+		var networkErr net.Error
+		if n != 0 || err == nil || (errors.As(err, &networkErr) && networkErr.Timeout()) {
+			t.Errorf("%s stream did not close after policy update: bytes=%d, err=%v", connection.name, n, err)
+		}
 	}
 	blocked, err := client.Get("http://8.8.8.8/")
 	if err != nil {
