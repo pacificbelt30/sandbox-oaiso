@@ -20,6 +20,26 @@ import (
 
 const jobOutputLimit int64 = 16 << 20
 
+func (b *Backend) jobRetrySpec(w http.ResponseWriter, r *http.Request, worker, job string) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	e := b.execs[job]
+	if e == nil || e.Container != worker || !e.Detached {
+		http.NotFound(w, r)
+		return
+	}
+	if !e.Started || e.Running || e.FinishedAt.IsZero() || e.ExitCode == 0 ||
+		len(e.Config.Env) != 0 || len(e.Config.Cmd) == 0 || e.Config.WorkingDir == "" || e.Config.Tty || e.Config.AttachStdin {
+		w.WriteHeader(http.StatusConflict)
+		return
+	}
+	reply(w, map[string]any{"id": e.ID, "worker": e.Container, "exit_code": e.ExitCode, "argv": e.Config.Cmd, "working_dir": e.Config.WorkingDir})
+}
+
 func (b *Backend) jobDir(e *execution) string {
 	return filepath.Join(b.path(e.Container), "jobs", e.ID)
 }

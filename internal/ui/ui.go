@@ -8,12 +8,9 @@ import (
 
 	"github.com/pacificbelt30/codex-dock/internal/brokersettings"
 	"github.com/pacificbelt30/codex-dock/internal/diagnostics"
-	"github.com/pacificbelt30/codex-dock/internal/engine"
 	"github.com/pacificbelt30/codex-dock/internal/instanceux"
-	"github.com/pacificbelt30/codex-dock/internal/policyevents"
 	"github.com/pacificbelt30/codex-dock/internal/sandboxux"
 	"github.com/pacificbelt30/codex-dock/internal/taskboard"
-	"github.com/pacificbelt30/codex-dock/internal/workeregress"
 
 	"github.com/gdamore/tcell/v2"
 	"github.com/pacificbelt30/codex-dock/internal/network"
@@ -160,7 +157,9 @@ func RunWithSandboxOptions(cfg sandbox.ManagerConfig, configPath, policyPath, po
 	}
 
 	showHelp := func() {
-		pages.AddAndSwitchToPage("help", helpModal(func() { pages.RemovePage("help"); showMain() }), true)
+		openDesktop(func() {
+			desktop.desktopDialog("help", " Keyboard shortcuts ", dashboardShortcuts(), tview.NewForm().AddButton("Close", desktop.back), false, desktop.back)
+		})
 	}
 
 	confirm := func(question string, action func()) {
@@ -292,12 +291,16 @@ func RunWithSandboxOptions(cfg sandbox.ManagerConfig, configPath, policyPath, po
 		return event
 	})
 	app.SetBeforeDrawFunc(func(screen tcell.Screen) bool {
+		if drawTerminalSizeNotice(screen) {
+			return true
+		}
 		width, _ := screen.Size()
 		if resizeDashboard(views, width) {
 			renderDashboard(views, model, time.Now())
 		}
 		return false
 	})
+	guardTerminalSize(app, pages)
 	// Key handling
 	table.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		row, _ := table.GetSelection()
@@ -422,20 +425,14 @@ func RunWithSandboxOptions(cfg sandbox.ManagerConfig, configPath, policyPath, po
 			return nil
 		case 'e', 'E':
 			if idx >= 0 && idx < len(workers) {
-				logView.Clear()
-				pages.SwitchToPage("logs")
 				selected := workers[idx]
-				go func() {
-					lw := &tviewWriter{view: logView, app: app}
-					err := workeregress.Events(context.Background(), engine.Socket(), selected.ID, false, func(e policyevents.Event) error {
-						_, err := fmt.Fprintf(lw, "%s source=%s destination=%s reason=%s\n", e.Time.Format("15:04:05"), e.Source, e.Destination, e.Code)
-						return err
-					})
-					if err != nil {
-						_, _ = fmt.Fprintln(lw, err)
-					}
-				}()
+				names := make(map[string]string, len(model.All))
+				for _, worker := range model.All {
+					names[worker.ID] = worker.Name
+				}
+				openDesktop(func() { desktop.openEgress(selected, names) })
 			}
+			return nil
 		case 'p', 'P':
 			if configPath != "" {
 				pages.SwitchToPage("proxy")

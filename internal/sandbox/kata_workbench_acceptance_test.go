@@ -128,6 +128,51 @@ func TestKataWorkbenchFeatures(t *testing.T) {
 			t.Fatal("selected stop affected wrong job", jobs)
 		}
 	}
+	t.Run("RetryFailedJob", func(t *testing.T) {
+		directory := filepath.Join(project, "job-retry")
+		if e := os.Mkdir(directory, 0700); e != nil {
+			t.Fatal(e)
+		}
+		failed, e := m.StartJob(ctx, id, sandbox.ExecOptions{
+			Argv:       []string{"/bin/sh", "-lc", "if test -f ready; then echo RETRY_AFTER; else echo RETRY_BEFORE; exit 23; fi"},
+			WorkingDir: "/workspace/job-retry",
+		})
+		if e != nil {
+			t.Fatal(e)
+		}
+		for failed.Running {
+			select {
+			case <-ctx.Done():
+				t.Fatal(ctx.Err())
+			case <-time.After(100 * time.Millisecond):
+			}
+			failed, e = m.Job(ctx, id, failed.ID)
+			if e != nil {
+				t.Fatal(e)
+			}
+		}
+		if failed.ExitCode != 23 {
+			t.Fatal("original job did not fail as expected", failed)
+		}
+		if e = os.WriteFile(filepath.Join(directory, "ready"), nil, 0600); e != nil {
+			t.Fatal(e)
+		}
+		targetIndex = 0
+		for _, existing := range jobs {
+			if existing.ID < failed.ID {
+				targetIndex++
+			}
+		}
+		probe("retry")
+		results, e := m.ListJobs(ctx, id)
+		if e != nil || len(results) != len(jobs)+2 {
+			t.Fatal("retry did not create exactly one additional job", results, e)
+		}
+		result, e := m.Job(ctx, id, failed.ID)
+		if e != nil || result.Running || result.ExitCode != 23 {
+			t.Fatal("retry changed the original result", result, e)
+		}
+	})
 	file, err := os.Open(archive)
 	if err != nil {
 		t.Fatal(err)

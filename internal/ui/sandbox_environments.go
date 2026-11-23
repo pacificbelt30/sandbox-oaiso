@@ -13,13 +13,27 @@ import (
 )
 
 func (d *sandboxDesktop) reviewPage(name, title, text string, approve, cancel func()) {
+	buttons := tview.NewForm().AddButton("Cancel", cancel).AddButton("Confirm", approve)
+	d.desktopDialog(name, title, text, buttons, false, cancel)
+}
+
+func (d *sandboxDesktop) desktopDialog(name, title, text string, buttons *tview.Form, focusButtons bool, back func()) {
 	view := tview.NewTextView().SetDynamicColors(false).SetScrollable(true).SetText(text)
 	view.SetBorder(true).SetTitle(title)
-	buttons := tview.NewForm().AddButton("Cancel", cancel).AddButton("Confirm", approve).SetButtonsAlign(tview.AlignCenter)
-	body := tview.NewFlex().SetDirection(tview.FlexRow).AddItem(view, 0, 1, true).AddItem(buttons, 3, 0, false).AddItem(tview.NewTextView().SetText("↑↓ / PgUp / PgDn scroll · Tab switches to buttons · Esc cancels"), 1, 0, false)
-	body.SetInputCapture(d.pageFormNavigation(view, buttons, cancel))
+	buttons.SetButtonsAlign(tview.AlignCenter)
+	hint := tview.NewTextView().SetText("PgUp/PgDn scroll · Tab moves focus · Esc back")
+	body := tview.NewFlex().SetDirection(tview.FlexRow).AddItem(view, 0, 1, !focusButtons).AddItem(buttons, 3, 0, focusButtons).AddItem(hint, 1, 0, false)
+	fitDesktopActions(body, buttons, hint)
+	navigate := d.pageFormNavigation(view, buttons, back)
+	body.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+		if !view.HasFocus() && (event.Key() == tcell.KeyPgUp || event.Key() == tcell.KeyPgDn) {
+			view.InputHandler()(event, nil)
+			return nil
+		}
+		return navigate(event)
+	})
 	d.pages.AddAndSwitchToPage(name, body, true)
-	d.app.SetFocus(view)
+	d.app.SetFocus(body)
 }
 
 func (d *sandboxDesktop) pageFormNavigation(view tview.Primitive, form *tview.Form, back func()) func(*tcell.EventKey) *tcell.EventKey {
@@ -31,6 +45,25 @@ func (d *sandboxDesktop) pageFormNavigation(view tview.Primitive, form *tview.Fo
 		if e.Key() != tcell.KeyTab && e.Key() != tcell.KeyBacktab {
 			return e
 		}
+		if form.GetFormItemCount() == 0 {
+			count, step := form.GetButtonCount(), 1
+			_, current := form.GetFocusedItemIndex()
+			if e.Key() == tcell.KeyBacktab {
+				step = -1
+				if view.HasFocus() {
+					current = count
+				}
+			}
+			for i := current + step; i >= 0 && i < count; i += step {
+				if !form.GetButton(i).IsDisabled() {
+					form.SetFocus(i)
+					d.app.SetFocus(form)
+					return nil
+				}
+			}
+			d.app.SetFocus(view)
+			return nil
+		}
 		if view.HasFocus() {
 			i := 0
 			if e.Key() == tcell.KeyBacktab {
@@ -41,7 +74,7 @@ func (d *sandboxDesktop) pageFormNavigation(view tview.Primitive, form *tview.Fo
 			return nil
 		}
 		item, button := form.GetFocusedItemIndex()
-		if (e.Key() == tcell.KeyTab && button == form.GetButtonCount()-1) || (e.Key() == tcell.KeyBacktab && (item == 0 || (form.GetFormItemCount() == 0 && button == 0))) {
+		if (e.Key() == tcell.KeyTab && button == form.GetButtonCount()-1) || (e.Key() == tcell.KeyBacktab && item == 0) {
 			d.app.SetFocus(view)
 			return nil
 		}

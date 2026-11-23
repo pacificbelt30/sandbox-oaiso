@@ -31,6 +31,7 @@ func dashboardActions(worker *sandbox.Worker, tasks bool) []dashboardAction {
 		items = append(items, runeAction("Instance details", "I · full name, image, policy and storage", 'i', true), dashboardAction{"View logs", "Enter · recent output", tcell.NewEventKey(tcell.KeyEnter, 0, 0), true})
 		items = append(items, runeAction("Background jobs", "J · start, inspect output or stop a job", 'J', true))
 		items = append(items, runeAction("Lifetime and storage", "L · deadlines, host quota, scoped supervision", 'l', true))
+		items = append(items, runeAction("Egress denials and permissions", "E · inspect denials and review a policy change", 'e', true))
 		if worker.Status == "running" {
 			items = append(items, runeAction("Stop sandbox", "S · preserve it for a later restart", 's', true))
 		}
@@ -76,7 +77,7 @@ func dashboardActionMenu(worker *sandbox.Worker, tasks bool, currentID func() st
 }
 
 func dashboardMenuPage(menu *tview.List) *tview.Flex {
-	return tview.NewFlex().SetDirection(tview.FlexRow).AddItem(menu, 0, 1, true).AddItem(tview.NewTextView().SetText("↑↓ choose · Enter or a shortcut selects · Esc returns\nTarget shown above. Delete asks for confirmation."), 2, 0, false)
+	return tview.NewFlex().SetDirection(tview.FlexRow).AddItem(menu, 0, 1, true).AddItem(tview.NewTextView().SetText("↑↓ choose · Enter open\nEsc back"), 2, 0, false)
 }
 
 func dashboardDetailPage(worker sandbox.Worker, back func()) *tview.Flex {

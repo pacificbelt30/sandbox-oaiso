@@ -58,7 +58,9 @@ func (d *sandboxDesktop) startWork(title string, timeout time.Duration, cancella
 			}
 		}
 		buttons := tview.NewForm().AddButton("Cancel", stop).SetCancelFunc(stop)
-		body := tview.NewFlex().SetDirection(tview.FlexRow).AddItem(text, 0, 1, false).AddItem(buttons, 3, 0, true).AddItem(tview.NewTextView().SetText("Esc cancels this read · Timeout returns to this page with Retry"), 1, 0, false)
+		hint := tview.NewTextView().SetText("Esc cancels this read")
+		body := tview.NewFlex().SetDirection(tview.FlexRow).AddItem(text, 0, 1, false).AddItem(buttons, 3, 0, true).AddItem(hint, 1, 0, false)
+		fitDesktopActions(body, buttons, hint)
 		body.SetInputCapture(func(e *tcell.EventKey) *tcell.EventKey {
 			if e.Key() == tcell.KeyEscape {
 				stop()
@@ -113,19 +115,19 @@ func (d *sandboxDesktop) startWork(title string, timeout time.Duration, cancella
 
 func (d *sandboxDesktop) readFailure(err error, retry func()) {
 	previous, primitive := d.pages.GetFrontPage()
-	modal := tview.NewModal().SetText(tview.Escape(err.Error())).AddButtons([]string{"Back", "Retry"})
-	modal.SetDoneFunc(func(index int, _ string) {
+	restore := func() {
 		d.pages.RemovePage("message")
 		d.pages.SwitchToPage(previous)
 		if primitive != nil {
 			d.app.SetFocus(primitive)
 		}
-		if index == 1 {
-			retry()
-		} else if primitive == nil {
+	}
+	back := func() {
+		restore()
+		if primitive == nil {
 			d.back()
 		}
-	})
-	d.pages.AddAndSwitchToPage("message", modal, true)
-	d.app.SetFocus(modal)
+	}
+	buttons := tview.NewForm().AddButton("Back", back).AddButton("Retry", func() { restore(); retry() })
+	d.desktopDialog("message", " Could not load ", err.Error(), buttons, true, back)
 }

@@ -25,6 +25,33 @@ type JobOutput struct {
 	Truncated bool   `json:"truncated"`
 }
 
+// JobRetrySpec is the retained invocation of a failed background job without
+// explicit environment overrides.
+type JobRetrySpec struct {
+	ID         string   `json:"id"`
+	Worker     string   `json:"worker"`
+	ExitCode   int      `json:"exit_code"`
+	Argv       []string `json:"argv"`
+	WorkingDir string   `json:"working_dir"`
+}
+
+func (m *Manager) JobRetrySpec(ctx context.Context, worker, eid string) (JobRetrySpec, error) {
+	w, err := m.InspectContext(ctx, worker)
+	if err != nil {
+		return JobRetrySpec{}, err
+	}
+	var spec JobRetrySpec
+	endpoint := "/containers/" + url.PathEscape(w.ID) + "/jobs/" + url.PathEscape(eid) + "/retry-spec"
+	if err = m.jobRequest(ctx, http.MethodGet, endpoint, &spec); err != nil {
+		return JobRetrySpec{}, fmt.Errorf("cannot load retry details for this job: %w", err)
+	}
+	if spec.Worker != w.ID || spec.ID != eid || spec.ExitCode == 0 ||
+		len(spec.Argv) == 0 || !path.IsAbs(spec.WorkingDir) || path.Clean(spec.WorkingDir) != spec.WorkingDir {
+		return JobRetrySpec{}, fmt.Errorf("invalid retained job retry details")
+	}
+	return spec, nil
+}
+
 func (m *Manager) StartJob(ctx context.Context, name string, opts ExecOptions) (Job, error) {
 	if err := validateExecEnv(opts.Env); err != nil {
 		return Job{}, err

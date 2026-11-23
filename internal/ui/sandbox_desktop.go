@@ -30,6 +30,7 @@ type desktopPreview struct {
 	Port   int
 }
 type desktopBackend struct {
+	Egress       desktopEgress
 	Compare      func(context.Context, string, bool) (sandboxux.Comparison, error)
 	FileDiff     func(context.Context, string, string, string) (string, error)
 	Diagnostics  func(context.Context, string) (workerstatus.Diagnostics, error)
@@ -78,7 +79,7 @@ func managerDesktop(cfg sandbox.ManagerConfig, m *sandbox.Manager, launcher sand
 	if socket == "" {
 		socket = engine.Socket()
 	}
-	return desktopBackend{Diagnostics: m.Diagnostics, FileDiff: func(ctx context.Context, id, base, path string) (string, error) {
+	return desktopBackend{Egress: nodeDesktopEgress(socket), Diagnostics: m.Diagnostics, FileDiff: func(ctx context.Context, id, base, path string) (string, error) {
 		return sandboxux.CompareFile(ctx, m, id, base, path)
 	}, Compare: func(ctx context.Context, id string, launch bool) (sandboxux.Comparison, error) {
 		base := "HEAD"
@@ -157,7 +158,7 @@ func (d *sandboxDesktop) releaseUpload(u *sandboxux.Upload) {
 }
 func (d *sandboxDesktop) message(text string) {
 	previous, primitive := d.pages.GetFrontPage()
-	modal := tview.NewModal().SetText(tview.Escape(text)).AddButtons([]string{"Close"}).SetDoneFunc(func(_ int, _ string) {
+	closeMessage := func() {
 		d.pages.RemovePage("message")
 		d.pages.SwitchToPage(previous)
 		if primitive != nil {
@@ -165,9 +166,8 @@ func (d *sandboxDesktop) message(text string) {
 		} else {
 			d.back()
 		}
-	})
-	d.pages.AddAndSwitchToPage("message", modal, true)
-	d.app.SetFocus(modal)
+	}
+	d.desktopDialog("message", " Sandbox result ", text, tview.NewForm().AddButton("Close", closeMessage), true, closeMessage)
 }
 func (d *sandboxDesktop) confirmation(text string, yes, no func()) {
 	previous, primitive := d.pages.GetFrontPage()
@@ -178,9 +178,9 @@ func (d *sandboxDesktop) confirmation(text string, yes, no func()) {
 			d.app.SetFocus(primitive)
 		}
 	}
-	modal := confirmationModal(text, func() { restore(); yes() }, func() { restore(); no() })
-	d.pages.AddAndSwitchToPage("confirm", modal, true)
-	d.app.SetFocus(modal)
+	cancel := func() { restore(); no() }
+	form := tview.NewForm().AddButton("Cancel", cancel).AddButton("Confirm", func() { restore(); yes() })
+	d.desktopDialog("confirm", " Confirm action ", text, form, true, cancel)
 }
 func (d *sandboxDesktop) cancelForm(form *tview.Form, back func()) {
 	form.SetInputCapture(func(e *tcell.EventKey) *tcell.EventKey {

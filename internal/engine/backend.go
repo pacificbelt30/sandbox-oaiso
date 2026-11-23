@@ -1175,6 +1175,14 @@ func (b *Backend) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	if len(parts) > 1 {
 		action = parts[1]
 	}
+	if action == "jobs" && len(parts) > 2 {
+		if len(parts) == 4 && parts[3] == "retry-spec" {
+			b.jobRetrySpec(w, r, value, parts[2])
+		} else {
+			http.NotFound(w, r)
+		}
+		return
+	}
 	if action == "attach" || action == "logs" || action == "wait" || action == "exec" || action == "jobs" {
 		b.streamHTTP(w, r, ctx, value, action)
 		return

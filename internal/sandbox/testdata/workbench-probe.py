@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import pty
 import select
+import signal
 import struct
 import subprocess
 import sys
@@ -61,6 +62,14 @@ def reviewed_confirm():
     send(b"\t\t\r")  # scrollable text -> Cancel -> Confirm
 
 
+def resize(rows, columns):
+    global screen, sent_at
+    screen = Screen(rows=rows, columns=columns)
+    sent_at = -1
+    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", rows, columns, 0, 0))
+    os.kill(process.pid, signal.SIGWINCH)
+
+
 try:
     expect(b"sort=name")
     send(b"/name:" + name.encode() + b"\r")
@@ -83,7 +92,40 @@ try:
         send(b"\t\r")
         expect(b"Start background job")
         send(b"\t\r")
+        expect(b"Job output")
         expect("JOB_READY 日本語 [red]literal".encode())
+        send(bytes([27]))
+        expect(b"Background jobs")
+        send(bytes([27]))
+        expect(b"sort=name")
+    elif phase == "retry":
+        if int(target_index):
+            send(b"\x1b[B" * int(target_index))
+        send(b"\r")
+        expect(b"RETRY_BEFORE")
+        expect(b"Exited \xc2\xb7 code 23")
+        send(b"\t\t\r")
+        expect(b"Review job retry")
+        expect(b"Working directory: /workspace/job-retry")
+        send(bytes([27]))
+        expect(b"RETRY_BEFORE")
+        send(b"\t\t\r")
+        expect(b"Review job retry")
+        reviewed_confirm()
+        expect(b"Exited \xc2\xb7 code 0")
+        expect(b"RETRY_AFTER")
+        expect(b"Previous output")
+        resize(12, 32)
+        expect(b"Prev log")
+        expect(b"Exited \xc2\xb7 code 0")
+        send(b"\t\t\x1b[Z\t\r")  # Both directions skip the disabled Retry.
+        expect(b"RETRY_BEFORE")
+        expect(b"Exited \xc2\xb7 code 23")
+        assert b"Back" in screen.text() and b"Prev log" not in screen.text()
+        send(bytes([27]))
+        expect(b"RETRY_AFTER")
+        resize(48, 150)
+        expect(b"Previous output")
         send(bytes([27]))
         expect(b"Background jobs")
         send(bytes([27]))

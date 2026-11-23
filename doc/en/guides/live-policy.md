@@ -16,6 +16,21 @@
 | Host configuration file | Not rewritten |
 | Persistence | Proxy-private 0600 file, restored after process restart; removed with the proxy |
 
+## Review a recorded denial in the TUI
+
+Available: **unreleased (main)**. Use a worker with a general egress proxy and an account with node-management permissions on the host. Open the TUI from the project directory.
+
+```bash
+oaiso ui
+```
+
+1. Select a worker and press `E`, or choose **Egress denials and permissions** from **Actions F2**. The history belongs to the shared proxy. Press `R` to refresh it.
+2. Select a row that says `Enter reviews a grant` and press `Enter`. Review the host to add, the before/after rules, the workers sharing the proxy, and the effect on existing HTTP/CONNECT connections. Press `Enter` on another denial to see its details.
+3. Press `Tab` to reach **Confirm**, then press `Enter` to apply. Press `Esc` or choose **Cancel** to return to the history.
+4. When the TUI shows `Policy applied`, a new generation, and `ready`, retry the original command in the worker. If application is unconfirmed, inspect the current rules with `oaiso policy show --worker <name>` before refreshing the history.
+
+The proposal adds an exact hostname missing from the allowlist. The existing port rules apply to the entire proxy. Explicit denies, IP restrictions, and DNS checks stay in effect.
+
 ## 1. Draft a proposal
 
 Example: propose an exact-host grant for `api.example.com:443`.

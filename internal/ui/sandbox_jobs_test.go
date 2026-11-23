@@ -2,6 +2,7 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -17,16 +18,26 @@ type desktopJobFixture struct {
 	calls   int
 	killed  []string
 	started []string
+	retry   *sandbox.JobRetrySpec
+	worker  string
+	dir     string
 }
 
-func (f *desktopJobFixture) StartJob(_ context.Context, _ string, o sandbox.ExecOptions) (sandbox.Job, error) {
+func (f *desktopJobFixture) StartJob(_ context.Context, worker string, o sandbox.ExecOptions) (sandbox.Job, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.started = append(f.started, strings.Join(o.Argv, " "))
+	f.worker, f.dir = worker, o.WorkingDir
 	return sandbox.Job{ID: "selected-job", Running: true}, nil
 }
 func (f *desktopJobFixture) ListJobs(context.Context, string) ([]sandbox.Job, error) {
 	return []sandbox.Job{{ID: "selected-job", ExitCode: 37}, {ID: "other-job", Running: true}}, nil
+}
+func (f *desktopJobFixture) JobRetrySpec(context.Context, string, string) (sandbox.JobRetrySpec, error) {
+	if f.retry != nil {
+		return *f.retry, nil
+	}
+	return sandbox.JobRetrySpec{}, errors.New("no retained retry spec")
 }
 func (f *desktopJobFixture) JobLogs(context.Context, string, string, int64) (sandbox.JobOutput, error) {
 	f.mu.Lock()
@@ -145,5 +156,61 @@ func TestNewJobReviewDisplaysLiteralCommandMarkup(t *testing.T) {
 	screen.Show()
 	if !strings.Contains(screenText(screen), "[red]literal") || len(fixture.started) != 0 {
 		t.Fatal("review interpreted markup or started without approval")
+	}
+}
+
+func TestRetryReviewRequiresApprovalAndRetainsExecutionSettings(t *testing.T) {
+	d, update, wait := runBrowser(t, &browserFiles{})
+	fixture := &desktopJobFixture{retry: &sandbox.JobRetrySpec{ID: "first", Worker: "worker", ExitCode: 23,
+		Argv: []string{"/bin/sh", "-lc", "printf '[red]literal'"}, WorkingDir: "/workspace/subdir"}}
+	worker := sandbox.Worker{ID: "worker", Status: "running"}
+	open := func() { d.reviewJobRetry(worker, sandbox.Job{ID: "first"}, func() {}) }
+	update(func() { d.backend.Jobs = fixture; open() })
+	wait()
+	update(func() {
+		name, page := d.pages.GetFrontPage()
+		if name != "job-retry" {
+			t.Error("missing retry review", name)
+			return
+		}
+		review := page.(*tview.Flex).GetItem(0).(*tview.TextView).GetText(false)
+		for _, want := range []string{"exit code 23", "/workspace/subdir", "printf '[red]literal'"} {
+			if !strings.Contains(review, want) {
+				t.Errorf("retry review omitted %q", want)
+			}
+		}
+		page.InputHandler()(tcell.NewEventKey(tcell.KeyEscape, 0, 0), func(p tview.Primitive) { d.app.SetFocus(p) })
+	})
+	fixture.mu.Lock()
+	if len(fixture.started) != 0 {
+		t.Error("cancel started a new job", fixture.started)
+	}
+	fixture.mu.Unlock()
+	update(open)
+	wait()
+	update(func() {
+		name, page := d.pages.GetFrontPage()
+		if name != "job-retry" {
+			t.Error("missing retry review", name)
+			return
+		}
+		confirm := page.(*tview.Flex).GetItem(1).(*tview.Form).GetButton(1)
+		confirm.InputHandler()(tcell.NewEventKey(tcell.KeyEnter, 0, 0), func(tview.Primitive) {})
+	})
+	wait()
+	update(func() {
+		name, page := d.pages.GetFrontPage()
+		if name != "job-logs" || page.(*tview.Flex).GetItem(2).(*tview.Form).GetButtonIndex("Previous output") < 0 {
+			t.Error("retry did not link to the original job", name)
+		}
+		if d.jobLogCancel != nil {
+			d.jobLogCancel()
+		}
+	})
+	fixture.mu.Lock()
+	defer fixture.mu.Unlock()
+	if len(fixture.started) != 1 || fixture.started[0] != "/bin/sh -lc printf '[red]literal'" ||
+		fixture.worker != "worker" || fixture.dir != "/workspace/subdir" {
+		t.Fatal("retry changed the reviewed invocation", fixture.started, fixture.worker, fixture.dir)
 	}
 }

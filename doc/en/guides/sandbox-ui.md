@@ -45,11 +45,12 @@ oaiso ui
 | Select, confirm, cancel in menus | Arrows select; Enter or a displayed shortcut confirms; Esc returns |
 | Create and connect | `N` creates; select a VM and press `C` for a shell |
 | Files, web and details | `F` files, `U` previews, `I` full details |
+| Egress denials and permissions | `E` [shared proxy history and change review](live-policy.md#review-a-recorded-denial-in-the-tui) (unreleased) |
 | Changes, artifacts and limits | `W` changes/export, `L` lifetime/storage/supervision |
 | One-off command | `X` opens the form; `Run` executes. Before execution, Esc cancels from the input or either button |
 | Move within forms | Tab / Shift-Tab; Space toggles checkboxes |
 
-Menus show actions appropriate to the VM state. Use `I` to inspect fields hidden on a narrow screen.
+Menus show actions appropriate to the VM state. Use `I` to inspect fields hidden on a narrow screen. Below 24 columns × 10 rows, the TUI asks you to enlarge the terminal. Enlarging it restores the current screen.
 
 The list's detail pane preserves its scroll position when the same VM refreshes and returns to the top when another VM is selected. Names and tasks display strings such as `[red]` literally. Command and agent-policy edit dialogs shrink to fit the terminal width.
 
@@ -173,6 +174,17 @@ Available: **v0.0.8**. Select a VM and press uppercase `J`, or choose `Backgroun
 - Stopping/removing the VM or enforcing its lifetime policy also terminates its jobs.
 - The list contains retained records. Running jobs have no final exit code; unavailable status is never displayed as success. Output is not retained after VM removal.
 - Commands execute inside the guest. Changes to writable shared directories also affect the host.
+
+### Retry a failed job
+
+Available: **unreleased (main)**. Use a matching TUI and node and keep the original VM running.
+
+1. Open a job with a nonzero exit code and choose **Retry…**.
+2. Review the original job ID, exit code, worker, guest working directory, and command. Choose **Confirm** to run the same command as a new job.
+3. Check the new output and exit code. Choose **Previous output** (**Prev log** in narrow terminals) to see the original output and exit code, then press `Esc` to return to the retry. After reopening the TUI, open either output from the job list.
+
+- The retry uses the current VM and files. It requires a retained working directory and a job without per-job environment overrides.
+- If the TUI cannot confirm the start, refresh the job list and check whether a new job appeared before trying again.
 
 ## Inspect and transfer files
 

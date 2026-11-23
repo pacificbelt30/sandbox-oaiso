@@ -3,6 +3,7 @@ package ui
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,6 +18,7 @@ import (
 
 type desktopJobs interface {
 	StartJob(context.Context, string, sandbox.ExecOptions) (sandbox.Job, error)
+	JobRetrySpec(context.Context, string, string) (sandbox.JobRetrySpec, error)
 	ListJobs(context.Context, string) ([]sandbox.Job, error)
 	JobLogs(context.Context, string, string, int64) (sandbox.JobOutput, error)
 	KillJob(context.Context, string, string) error
@@ -30,7 +32,9 @@ func (d *sandboxDesktop) jobs(worker sandbox.Worker) {
 	list := tview.NewList().ShowSecondaryText(true)
 	list.SetBorder(true).SetTitle(" Background jobs · " + tview.Escape(worker.Name) + " ")
 	form := tview.NewForm().AddButton("Refresh", func() { d.jobs(worker) }).AddButton("New job…", func() { d.newJob(worker) }).AddButton("Back", d.back)
-	body := tview.NewFlex().SetDirection(tview.FlexRow).AddItem(list, 0, 1, true).AddItem(form, 3, 0, false).AddItem(tview.NewTextView().SetText("Enter views output · Tab switches panes · Esc back\nJobs continue after TUI exit. Refresh to reload retained jobs."), 2, 0, false)
+	hint := tview.NewTextView().SetText("Enter opens output\nTab actions · Esc back")
+	body := tview.NewFlex().SetDirection(tview.FlexRow).AddItem(list, 0, 1, true).AddItem(form, 3, 0, false).AddItem(hint, 2, 0, false)
+	fitDesktopActions(body, form, hint, "Refresh", "New job", "Back")
 	body.SetInputCapture(d.pageFormNavigation(list, form, d.back))
 	d.pages.AddAndSwitchToPage("jobs", body, true)
 	d.app.SetFocus(list)
@@ -43,6 +47,8 @@ func (d *sandboxDesktop) jobs(worker sandbox.Worker) {
 				state := fmt.Sprintf("Exited · code %d", job.ExitCode)
 				if job.Running {
 					state = "Running · exit code pending"
+				} else if job.ExitCode != 0 {
+					state += " · Retry in output"
 				}
 				list.AddItem(tview.Escape(job.ID), state, 0, func() { d.jobOutput(worker, job) })
 			}
@@ -61,7 +67,7 @@ func (d *sandboxDesktop) newJob(worker sandbox.Worker) {
 	back := func() { d.jobs(worker) }
 	var form *tview.Form
 	form = commandForm(worker, func(command string) {
-		d.confirmation(tview.Escape("Start background job in "+worker.Name+"?\nWorking directory: /workspace\nCommand:\n"+command+"\n\nClosing the TUI does not stop the job. Use the job output page to stop it."), func() {
+		d.confirmation(cleanJobText("Start background job in "+worker.Name+"?\nWorking directory: /workspace\nCommand:\n"+command+"\n\nClosing the TUI does not stop the job. Use the job output page to stop it."), func() {
 			d.work(func(ctx context.Context) (func(), error) {
 				job, err := d.backend.Jobs.StartJob(ctx, worker.ID, sandbox.ExecOptions{Argv: []string{"/bin/sh", "-lc", command}, WorkingDir: "/workspace"})
 				return func() { d.jobOutput(worker, job) }, err
@@ -86,25 +92,80 @@ func cleanJobText(text string) string {
 }
 
 func (d *sandboxDesktop) jobOutput(worker sandbox.Worker, job sandbox.Job) {
+	d.showJobOutput(worker, job, nil, func() { d.jobs(worker) })
+}
+
+func (d *sandboxDesktop) reviewJobRetry(worker sandbox.Worker, job sandbox.Job, restore func()) {
+	if worker.Status != "running" {
+		d.message("Start this sandbox with R before retrying a job.")
+		return
+	}
+	d.read("Reading the previous job's command", func(ctx context.Context) (func(), error) {
+		spec, err := d.backend.Jobs.JobRetrySpec(ctx, worker.ID, job.ID)
+		if err != nil {
+			return nil, fmt.Errorf("retry needs a retained failed job with its working directory and no environment overrides.\n\nRefresh the jobs list if the record is missing. Use a matching TUI and node.\n\n%w", err)
+		}
+		args := make([]string, 0, len(spec.Argv))
+		for _, a := range spec.Argv {
+			args = append(args, strconv.Quote(a))
+		}
+		command := "Arguments (one per line):\n" + strings.Join(args, "\n")
+		if len(spec.Argv) == 3 && slices.Equal(spec.Argv[:2], []string{"/bin/sh", "-lc"}) {
+			command = "Command (/bin/sh -lc):\n" + spec.Argv[2]
+		}
+		text := cleanJobText(fmt.Sprintf("Sandbox: %s\nWorking directory: %s\nPrevious job: %s · exit code %d\n\n%s\n\nThe new job gets its own output and exit code.", worker.Name, spec.WorkingDir, spec.ID, spec.ExitCode, command))
+		return func() {
+			back := func() { d.pages.RemovePage("job-retry"); restore() }
+			d.reviewPage("job-retry", " Review job retry ", text, func() {
+				d.work(func(ctx context.Context) (func(), error) {
+					retry, err := d.backend.Jobs.StartJob(ctx, spec.Worker, sandbox.ExecOptions{Argv: spec.Argv, WorkingDir: spec.WorkingDir})
+					return func() {
+						back()
+						if err != nil {
+							d.message("Retry start was not confirmed. Check the job list before trying again.\n\n" + err.Error())
+							return
+						}
+						previous := sandbox.Job{ID: spec.ID, Worker: spec.Worker, ExitCode: spec.ExitCode}
+						d.showJobOutput(worker, retry, &previous, func() { d.jobs(worker) })
+					}, nil
+				})
+			}, back)
+		}, nil
+	})
+}
+
+func (d *sandboxDesktop) showJobOutput(worker sandbox.Worker, job sandbox.Job, previous *sandbox.Job, onBack func()) {
 	if d.jobLogCancel != nil {
 		d.jobLogCancel()
 	}
 	ctx, cancel := context.WithCancel(d.ctx)
 	d.jobLogCancel = cancel
-	back := func() { cancel(); d.pages.RemovePage("job-logs"); d.jobs(worker) }
+	back := func() { cancel(); d.pages.RemovePage("job-logs"); onBack() }
 	view := tview.NewTextView().SetDynamicColors(false).SetScrollable(true)
 	view.SetBorder(true).SetTitle(" Job output · " + tview.Escape(job.ID) + " ")
 	state := tview.NewTextView().SetDynamicColors(false).SetText("Reading retained output…")
+	restore := func() { d.pages.SwitchToPage("job-logs"); d.app.SetFocus(view) }
 	form := tview.NewForm().AddButton("Stop job…", func() {
-		d.confirmation(tview.Escape("Stop only job "+job.ID+" in "+worker.Name+"?\nThe VM and other jobs remain."), func() {
+		d.confirmation(cleanJobText("Stop only job "+job.ID+" in "+worker.Name+"?\nThe VM and other jobs remain."), func() {
 			d.work(func(c context.Context) (func(), error) {
 				err := d.backend.Jobs.KillJob(c, worker.ID, job.ID)
-				return func() { d.jobOutput(worker, job) }, err
+				return func() { d.showJobOutput(worker, job, previous, onBack) }, err
 			})
-		}, func() { d.pages.SwitchToPage("job-logs"); d.app.SetFocus(view) })
-	}).AddButton("Back", back)
+		}, restore)
+	}).AddButton("Retry…", func() { d.reviewJobRetry(worker, job, restore) })
+	retry := form.GetButton(1).SetDisabled(job.Running || job.ExitCode == 0 || worker.Status != "running")
+	compact := []string{"Stop…", "Retry…"}
+	if previous != nil {
+		form.AddButton("Previous output", func() {
+			d.showJobOutput(worker, *previous, nil, func() { d.showJobOutput(worker, job, previous, onBack) })
+		})
+		compact = append(compact, "Prev log")
+	}
+	form.AddButton("Back", back)
 	follow := true
-	body := tview.NewFlex().SetDirection(tview.FlexRow).AddItem(view, 0, 1, true).AddItem(state, 2, 0, false).AddItem(form, 3, 0, false).AddItem(tview.NewTextView().SetText("Space pauses/resumes following · Tab switches panes · Esc returns without stopping job"), 1, 0, false)
+	hint := tview.NewTextView().SetText("Space pause/resume\nTab actions · Esc back")
+	body := tview.NewFlex().SetDirection(tview.FlexRow).AddItem(view, 0, 1, true).AddItem(state, 2, 0, false).AddItem(form, 3, 0, false).AddItem(hint, 2, 0, false)
+	fitDesktopActions(body, form, hint, compact...)
 	navigation := d.pageFormNavigation(view, form, back)
 	body.SetInputCapture(func(e *tcell.EventKey) *tcell.EventKey {
 		if e.Rune() == ' ' && view.HasFocus() {
@@ -175,6 +236,7 @@ func (d *sandboxDesktop) jobOutput(worker sandbox.Worker, job sandbox.Job) {
 					return
 				}
 				final := "Exited · final code unavailable"
+				canRetry := false
 				if e != nil {
 					final += " · " + e.Error()
 				} else {
@@ -184,6 +246,7 @@ func (d *sandboxDesktop) jobOutput(worker sandbox.Worker, job sandbox.Job) {
 								final = "Running · exit status changed; reopen output"
 							} else {
 								final = fmt.Sprintf("Exited · code %d", j.ExitCode)
+								canRetry = j.ExitCode != 0 && worker.Status == "running"
 							}
 							break
 						}
@@ -192,6 +255,7 @@ func (d *sandboxDesktop) jobOutput(worker sandbox.Worker, job sandbox.Job) {
 				d.app.QueueUpdateDraw(func() {
 					if ctx.Err() == nil {
 						state.SetText(final)
+						retry.SetDisabled(!canRetry)
 					}
 				})
 				return

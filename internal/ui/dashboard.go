@@ -35,7 +35,7 @@ func newDashboardViews() dashboardViews {
 }
 
 func dashboardHelp(_ bool) string {
-	return "[yellow]N[-] New  [yellow]F[-] Files  [yellow]U[-] Preview  [yellow]I[-] Info  [yellow]/[-] Filter\n[yellow]Enter[-] Logs  [yellow]C[-] Connect  [yellow]?[-] Help  [yellow]Q[-] Quit"
+	return "[yellow]N[-] New  [yellow]J[-] Jobs  [yellow]E[-] Egress  [yellow]I[-] Info  [yellow]/[-] Filter\n[yellow]Enter[-] Logs  [yellow]C[-] Connect  [yellow]?[-] Help  [yellow]Q[-] Quit"
 }
 
 type dashboardLayout struct {
@@ -151,8 +151,8 @@ func setupTableHeader(table *tview.Table, compact bool) {
 	}
 }
 
-func helpModal(done func()) *tview.Modal {
-	text := `Instance dashboard
+func dashboardShortcuts() string {
+	return `Instance dashboard
 
 F2 / Space   choose an action using arrows and Enter; Esc cancels
 Tab     focus the Actions button; Tab again returns to the list
@@ -164,7 +164,7 @@ K       save selected stopped VM (filtered rootfs, optional workspace)
 F       browse, view and transfer workspace files
 W       guest Git changes and selected artifact export
 L       lifetime, host quota and selected-VM supervision
-J       background jobs: start, logs and stop
+J       background jobs: start, logs, stop and retry
 U       manage authenticated localhost Web previews
 I       inspect full instance details, including on a narrow screen
 Enter   view recent logs
@@ -176,7 +176,7 @@ V       show instance status and metadata changes seen while the TUI is open
 S       stop the selected running worker
 R       start a stopped worker
 D       delete after confirmation
-E       show recorded egress denials
+E       view shared egress denials and review exact-host grants
 A       stop every running worker after confirmation
 P / B   proxy / broker settings
 G       host agent policies: clone, edit, review, and select a default
@@ -184,10 +184,6 @@ T       task board: queue, execute, test, review and adopt results
 Q       quit; Escape closes a panel
 
 Existing agent processes continue while a connected shell is open.`
-	modal := tview.NewModal().SetText(text).AddButtons([]string{"Close"})
-	modal.SetTitle(" Help ")
-	modal.SetDoneFunc(func(_ int, _ string) { done() })
-	return modal
 }
 
 func confirmationModal(question string, confirm func(), cancel func()) *tview.Modal {
