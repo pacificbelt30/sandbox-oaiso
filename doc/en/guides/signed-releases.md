@@ -28,10 +28,10 @@ Checksums detect corruption; they do not replace signatures. CI obtains short-li
 
 ## Verify the installer before executing it
 
-Run as a normal user. This block verifies v0.0.9 and displays the installation plan.
+Run as a normal user. This block verifies v0.0.10 and displays the installation plan.
 
 ```bash
-export RELEASE_TAG=v0.0.9
+export RELEASE_TAG=v0.0.10
 bash <<'SH'
 set -euo pipefail
 : "${RELEASE_TAG:?Export the signed release tag first}"

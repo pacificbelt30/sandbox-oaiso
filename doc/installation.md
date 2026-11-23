@@ -13,7 +13,7 @@
 
 更新時は、データを保管してから停止済みを含む全VMを削除し、その後Proxyを停止・削除します。AI認証付きワーカーでは削除時にProxyへ失効を確認します。停止だけでは適用できません。rootfsと専用DBは別に保存し、新規VMへ復元します。[更新と復旧の条件](setup.md#更新する)を先に確認してください。
 
-- この手順では署名付きのビルド済み配布版（v0.0.9）を導入します。
+- この手順では署名付きのビルド済み配布版（v0.0.10）を導入します。
 - 一続きの操作例：[インストールから初回起動まで](guides/first-run.md)。
 - このページの`releases/latest`は公開版を導入する手順です。
 - Ubuntu 24.04の自動判定はv0.0.9以降です。v0.0.8以前から更新する場合は、このページの配布インストーラーを取得してください。旧CLIの`upgrade`は移転前のリポジトリ名を使います。
@@ -76,7 +76,7 @@ curl -fsSL https://github.com/pacificbelt30/sandbox-oaiso/releases/latest/downlo
 
 ```text
 Plan: verified Ubuntu 26.04 amd64 node; Kata 4.3.0 / Dragonball / containerd 2.4.2 / BuildKit 0.34.0 / runc 1.4.3
-Bundle: /tmp/oaiso-release-<id>/bundle (version v0.0.9); operator: user; cache: /var/cache/codex-dock-setup; offline: no
+Bundle: /tmp/oaiso-release-<id>/bundle (version v0.0.10); operator: user; cache: /var/cache/codex-dock-setup; offline: no
 ```
 
 - 版・パス・利用者名は例。実際の環境とリリースにより変わります。
@@ -87,7 +87,7 @@ Bundle: /tmp/oaiso-release-<id>/bundle (version v0.0.9); operator: user; cache: 
 | コマンド・指定 | 動作 |
 |---|---|
 | 指定なし | 同じリリースのCLI・補助プログラムを取得・検証し、配置計画を表示 |
-| `--version v0.0.9` | 指定版を取得 |
+| `--version v0.0.10` | 指定版を取得 |
 | `--apply` | 計画成功後に `sudo` で配置。選択済みPythonの絶対パスも渡す |
 | operator省略 | スクリプトを実行した通常ユーザーを登録 |
 | `--operator USER` | 別の既存通常ユーザーを登録。rootから実行する場合は必須 |
@@ -105,13 +105,13 @@ Bundle: /tmp/oaiso-release-<id>/bundle (version v0.0.9); operator: user; cache: 
 
 ### 版を固定して取得・実行する
 
-**v0.0.9を指定する例。保存したスクリプトを確認してから、同じファイルで計画・適用します。**
+**v0.0.10を指定する例。保存したスクリプトを確認してから、同じファイルで計画・適用します。**
 
 ```bash
-curl -fsSL -o install.sh https://github.com/pacificbelt30/sandbox-oaiso/releases/download/v0.0.9/install.sh
+curl -fsSL -o install.sh https://github.com/pacificbelt30/sandbox-oaiso/releases/download/v0.0.10/install.sh
 less install.sh
-bash install.sh --version v0.0.9
-bash install.sh --version v0.0.9 --apply
+bash install.sh --version v0.0.10
+bash install.sh --version v0.0.10 --apply
 ```
 
 ## 4. 再ログインして確認

@@ -18,7 +18,7 @@
 
 ## Review a recorded denial in the TUI
 
-Available: **unreleased (main)**. Use a worker with a general egress proxy and an account with node-management permissions on the host. Open the TUI from the project directory.
+Available: **v0.0.10 and later**. Use a worker with a general egress proxy and an account with node-management permissions on the host. Open the TUI from the project directory.
 
 ```bash
 oaiso ui

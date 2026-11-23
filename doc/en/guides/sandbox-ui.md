@@ -45,7 +45,7 @@ oaiso ui
 | Select, confirm, cancel in menus | Arrows select; Enter or a displayed shortcut confirms; Esc returns |
 | Create and connect | `N` creates; select a VM and press `C` for a shell |
 | Files, web and details | `F` files, `U` previews, `I` full details |
-| Egress denials and permissions | `E` [shared proxy history and change review](live-policy.md#review-a-recorded-denial-in-the-tui) (unreleased) |
+| Egress denials and permissions | `E` [shared proxy history and change review](live-policy.md#review-a-recorded-denial-in-the-tui) (v0.0.10 and later) |
 | Changes, artifacts and limits | `W` changes/export, `L` lifetime/storage/supervision |
 | One-off command | `X` opens the form; `Run` executes. Before execution, Esc cancels from the input or either button |
 | Move within forms | Tab / Shift-Tab; Space toggles checkboxes |
@@ -177,7 +177,7 @@ Available: **v0.0.8**. Select a VM and press uppercase `J`, or choose `Backgroun
 
 ### Retry a failed job
 
-Available: **unreleased (main)**. Use a matching TUI and node and keep the original VM running.
+Available: **v0.0.10 and later**. Use a matching TUI and node and keep the original VM running.
 
 1. Open a job with a nonzero exit code and choose **Retry…**.
 2. Review the original job ID, exit code, worker, guest working directory, and command. Choose **Confirm** to run the same command as a new job.
