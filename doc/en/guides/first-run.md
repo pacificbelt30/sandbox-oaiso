@@ -3,7 +3,7 @@
 [日本語](../../guides/first-run.md) | **English**
 
 - This page covers v0.0.4 or later. Check `oaiso --version` first.
-- Ubuntu 24.04 detection is unreleased (main). Requires Ubuntu 24.04/26.04, x86_64, systemd, KVM and cgroup v2. [Requirements](../installation.md#1-requirements).
+- Ubuntu 24.04 detection is available from v0.0.9. Requires Ubuntu 24.04/26.04, x86_64, systemd, KVM and cgroup v2. [Requirements](../installation.md#1-requirements).
 
 This page covers installation and authentication for AI agents. For use without AI credentials, follow the [sandbox guide](sandbox-ui.md), v0.0.8.
 
@@ -12,8 +12,8 @@ This page covers installation and authentication for AI agents. For use without 
 Run as a normal user, review the plan, then apply it. First [prepare curl, CA certificates and GitHub CLI](../installation.md#2-prepare-tools). GitHub CLI verifies release signatures.
 
 ```bash
-curl -fsSL https://github.com/pacificbelt30/sandbox-oasis/releases/latest/download/install.sh | bash
-curl -fsSL https://github.com/pacificbelt30/sandbox-oasis/releases/latest/download/install.sh | bash -s -- --apply
+curl -fsSL https://github.com/pacificbelt30/sandbox-oaiso/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/pacificbelt30/sandbox-oaiso/releases/latest/download/install.sh | bash -s -- --apply
 ```
 
 - No Go, Make or source checkout is required. The script prepares uv/Python.

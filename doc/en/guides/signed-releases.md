@@ -9,7 +9,7 @@
 |---|---|
 | Signature | GitHub OIDC/Sigstore, using official GitHub CLI trusted roots; never trust keys supplied by the artifact |
 | Built source | All three executables must identify the current clean checkout commit in Go build metadata |
-| Publisher | Exact `pacificbelt30/sandbox-oasis/.github/workflows/release.yml` and selected `refs/tags/<version>` |
+| Publisher | Exact `pacificbelt30/sandbox-oaiso/.github/workflows/release.yml` and selected `refs/tags/<version>` |
 | Runner | GitHub-hosted; reject self-hosted provenance |
 | Subjects | Archive, installer, SHA256SUMS and SBOM |
 | Portable evidence | `provenance.json` signature/certificate/transparency verification bundle |
@@ -28,23 +28,23 @@ Checksums detect corruption; they do not replace signatures. CI obtains short-li
 
 ## Verify the installer before executing it
 
-Run as a normal user. This block verifies v0.0.8 and displays the installation plan.
+Run as a normal user. This block verifies v0.0.9 and displays the installation plan.
 
 ```bash
-export RELEASE_TAG=v0.0.8
+export RELEASE_TAG=v0.0.9
 bash <<'SH'
 set -euo pipefail
 : "${RELEASE_TAG:?Export the signed release tag first}"
 oaiso_install_dir=$(mktemp -d)
 trap 'rm -rf -- "$oaiso_install_dir"' EXIT
-base="https://github.com/pacificbelt30/sandbox-oasis/releases/download/$RELEASE_TAG"
+base="https://github.com/pacificbelt30/sandbox-oaiso/releases/download/$RELEASE_TAG"
 curl -fLsS --proto '=https' --proto-redir '=https' "$base/install.sh" -o "$oaiso_install_dir/install.sh"
 curl -fLsS --proto '=https' --proto-redir '=https' "$base/provenance.json" -o "$oaiso_install_dir/provenance.json"
 gh attestation verify "$oaiso_install_dir/install.sh" \
   --bundle "$oaiso_install_dir/provenance.json" \
-  --repo pacificbelt30/sandbox-oasis \
+  --repo pacificbelt30/sandbox-oaiso \
   --source-ref "refs/tags/$RELEASE_TAG" \
-  --cert-identity "https://github.com/pacificbelt30/sandbox-oasis/.github/workflows/release.yml@refs/tags/$RELEASE_TAG" \
+  --cert-identity "https://github.com/pacificbelt30/sandbox-oaiso/.github/workflows/release.yml@refs/tags/$RELEASE_TAG" \
   --cert-oidc-issuer https://token.actions.githubusercontent.com \
   --deny-self-hosted-runners --hostname github.com
 bash "$oaiso_install_dir/install.sh" --version "$RELEASE_TAG"
@@ -66,3 +66,5 @@ Success verifies the script and displays a plan. To apply, add `--apply` to the 
 A valid signature does not guarantee absence of vulnerabilities, reproducible builds or guest image safety. Main CI creates real test signatures and rejects altered artifacts/wrong workflows/wrong tags; those CI signatures cannot satisfy release admission policy.
 
 See [official attestations](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations), [verification CLI](https://cli.github.com/manual/gh_attestation_verify) and [test evidence](../../testing.md).
+
+For manual verification of v0.0.4 through v0.0.8, download from the current repository and use the original `pacificbelt30/sandbox-oasis` in both `--repo` and `--cert-identity`.

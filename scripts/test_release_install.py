@@ -250,6 +250,15 @@ class SignatureBoundaryTests(unittest.TestCase):
                 self.assertIn('--cert-oidc-issuer', argv)
                 self.assertIn('--deny-self-hosted-runners', argv)
 
+    def test_legacy_release_uses_original_signer(self):
+        with patch.object(INSTALLER.shutil, 'which', return_value='/fixture/gh'), \
+                patch.object(INSTALLER.subprocess, 'run') as verify:
+            INSTALLER.verify_attestation('archive', 'provenance.json', 'v0.0.8')
+            args = verify.call_args.args[0]
+            self.assertEqual(args[args.index('--repo') + 1], 'pacificbelt30/sandbox-oasis')
+            self.assertEqual(args[args.index('--cert-identity') + 1],
+                             'https://github.com/pacificbelt30/sandbox-oasis/.github/workflows/release.yml@refs/tags/v0.0.8')
+
     def test_sbom_uses_built_binary_dependencies_and_runtime_pins(self):
         info = {'GoVersion': 'go1.27.3', 'Deps': [{'Path': 'example.org/dependency', 'Version': 'v1.2.3', 'Sum': 'h1:fixture'}]}
         with tempfile.TemporaryDirectory() as temporary:

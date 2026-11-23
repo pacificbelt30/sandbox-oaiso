@@ -2,7 +2,7 @@
 
 **日本語** | [English](../en/guides/wsl.md)
 
-Ubuntu 24.04の自動判定とWSL向け事前確認は**未リリース（main）**です。公開版v0.0.8の自動配置はUbuntu 26.04のみ対象です。24.04では対応するソースから[ビルド](../setup.md#ソースからビルドする場合)します。
+Ubuntu 24.04の自動判定とWSL向け事前確認は**v0.0.9以降**です。[配布インストーラー](../installation.md)を使います。
 
 対象はWindows 11上の**WSL2・Linux x86_64**です。Ubuntuの版だけではKataの実行可否は決まりません。実WSLでの導入・再起動・VPN接続は未検証です。[検証範囲](../testing.md)と、次の条件を確認してください。
 
@@ -48,7 +48,7 @@ wsl --distribution Ubuntu-24.04
 
 ## 2. WSL内の必須機能を確認する
 
-未リリース（main）のsetupは、適用時と次回起動用に`vhost_vsock`・`vhost_net`・`tun`を準備します。以下は導入前の確認・手動復旧用です。WSL内のUbuntuのシェルで実行します。`kmod`がなければ、先に`sudo apt-get install -y kmod`で導入します。
+v0.0.9以降のsetupは、適用時と次回起動用に`vhost_vsock`・`vhost_net`・`tun`を準備します。以下は導入前の確認・手動復旧用です。WSL内のUbuntuのシェルで実行します。`kmod`がなければ、先に`sudo apt-get install -y kmod`で導入します。
 
 ```bash
 uname -r
@@ -117,7 +117,7 @@ containerdのunitは`RequiresMountsFor`でこのmountを待ちます。XFSやquo
 
 ## 4. 配置と実動作を確認する
 
-[ソースからの配置](../setup.md#ソースからビルドする場合)または対応版のバンドルで、計画を確認して適用します。WSL向け事前確認では、計画時にも専用XFSが必要です。通常ユーザーの計画ではrootでのKVM検査を保留した旨を表示し、rootの適用前に検査します。
+[配布インストーラー](../installation.md#3-計画を確認してインストール)で、計画を確認して適用します。WSL向け事前確認では、計画時にも専用XFSが必要です。通常ユーザーの計画ではrootでのKVM検査を保留した旨を表示し、rootの適用前に検査します。
 
 配置後はWSL内の通常ユーザーで実行します。
 

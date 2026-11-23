@@ -2,7 +2,7 @@
 
 [日本語](../../guides/wsl.md) | **English**
 
-Ubuntu 24.04 detection and WSL preflight checks are **unreleased (main)**. The published v0.0.8 automatic installer supports only Ubuntu 26.04. For 24.04, [build the supporting source](../../setup.md#ソースからビルドする場合) (Japanese).
+Ubuntu 24.04 detection and WSL preflight checks are **available from v0.0.9**. Use the [release installer](../installation.md).
 
 This guide targets **WSL2 on Linux x86_64 under Windows 11**. The Ubuntu version alone does not establish Kata compatibility. Installation, restart and VPN access on real WSL remain unverified; see the [verification scope](../../testing.md) (Japanese).
 
@@ -48,7 +48,7 @@ wsl --distribution Ubuntu-24.04
 
 ## 2. Check Linux prerequisites
 
-Unreleased (main) setup prepares `vhost_vsock`, `vhost_net` and `tun` during application and for subsequent boots. The commands below are pre-installation checks and manual recovery steps. Run inside Ubuntu on WSL. If `kmod` is missing, install it first with `sudo apt-get install -y kmod`.
+From v0.0.9, setup prepares `vhost_vsock`, `vhost_net` and `tun` during application and for subsequent boots. The commands below are pre-installation checks and manual recovery steps. Run inside Ubuntu on WSL. If `kmod` is missing, install it first with `sudo apt-get install -y kmod`.
 
 ```bash
 uname -r
@@ -117,7 +117,7 @@ The containerd unit waits for this mount through `RequiresMountsFor`. Correct mo
 
 ## 4. Install and verify operation
 
-Use the [source installation](../../setup.md#ソースからビルドする場合) (Japanese) or a supporting bundle, review the plan, then apply. WSL preflight requires dedicated XFS even in plan mode. An unprivileged plan reports that root KVM probing is deferred; the root invocation checks it before applying.
+Use the [release installer](../installation.md) to review the plan and apply it. WSL preflight requires dedicated XFS even in plan mode. An unprivileged plan reports that root KVM probing is deferred; the root invocation checks it before applying.
 
 After installation, run as the normal WSL user:
 

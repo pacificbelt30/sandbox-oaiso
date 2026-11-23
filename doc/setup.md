@@ -11,7 +11,7 @@
 | ホスト自体がVM | nested virtualizationも必要 |
 
 - WSL2：[必須機能・専用XFS・再起動後の確認](guides/wsl.md)。Ubuntuの版だけではKataの実行可否は判定できません。
-- Ubuntu 24.04の自動判定：未リリース（main）。公開版v0.0.8は26.04のみ対象です。24.04では対応するソースからバンドルを作成します。
+- Ubuntu 24.04の自動判定はv0.0.9以降です。v0.0.8以前からの更新は[配布インストーラー](installation.md)を使います。
 
 ## 初めて配置する
 
@@ -20,15 +20,14 @@
 ### 配置計画を確認して適用する
 
 ```bash
-curl -fsSL https://github.com/pacificbelt30/sandbox-oasis/releases/latest/download/install.sh | bash
-curl -fsSL https://github.com/pacificbelt30/sandbox-oasis/releases/latest/download/install.sh | bash -s -- --apply
+curl -fsSL https://github.com/pacificbelt30/sandbox-oaiso/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/pacificbelt30/sandbox-oaiso/releases/latest/download/install.sh | bash -s -- --apply
 ```
 
 - GitHub Releasesのビルド済みCLI・補助プログラムを使います。Go・Make・ソース取得は不要です。
 - uvとPython 3.12は、なければユーザー用領域へ準備します。
 - リリースのインストーラーは、そのリリースと同じ版の配布物を取得します。
-- 配布アーカイブのSHA-256、`bundle.json` の版と各ファイルのSHA-256、実CLIの版を検証してから実行します。
-- SHA-256は破損・取り違えの検出用です。配布元の独立した署名検証ではありません。
+- オンライン取得では、配布アーカイブの[署名と作成元](guides/signed-releases.md)、SHA-256、`bundle.json`の版と各ファイルのSHA-256、実CLIの版を検証してから実行します。
 
 | 指定 | 動作・条件 |
 |---|---|
@@ -77,7 +76,7 @@ bash install.sh --bundle /path/to/node-bundle --apply
 2. 以下でソースを取得し、配置計画を確認して適用。
 
 ```bash
-git clone https://github.com/pacificbelt30/sandbox-oasis.git
+git clone https://github.com/pacificbelt30/sandbox-oaiso.git
 cd sandbox-oasis
 ./scripts/install.sh
 ./scripts/install.sh --apply
@@ -143,13 +142,13 @@ oaiso init --agent claude
 | 固定配布物 | Kata 4.2.0・containerd 2.4.2・BuildKit 0.34.0・runc 1.4.3 |
 | guest・固定資産 | PID hook・共有cache無効のDragonball設定・manifest |
 | サービス・権限 | 専用containerd・node・BuildKit・`codex-dock` グループ |
-| ホスト設定 | IPv4 forwarding・次回起動用vsock/net/tunモジュール（tunは未リリース（main）） |
+| ホスト設定 | IPv4 forwarding・次回起動用vsock/net/tunモジュール（tunはv0.0.9以降） |
 
 ### 配布物と権限の確認
 
 | 項目 | 確認事項 |
 |---|---|
-| 外部配布物 | [固定URLとSHA256](https://github.com/pacificbelt30/sandbox-oasis/blob/main/deploy/kata/assets.lock.json)で検証 |
+| 外部配布物 | [固定URLとSHA256](https://github.com/pacificbelt30/sandbox-oaiso/blob/main/deploy/kata/assets.lock.json)で検証 |
 | 自作バンドルの `bundle.json` | CLI/helperの組合せ・破損を検出。配布元の署名ではない |
 | バンドルの入手元 | 信頼したソースからビルドしたものを使用 |
 | 管理グループ | ホストmount・任意イメージを選択できるroot相当の権限 |

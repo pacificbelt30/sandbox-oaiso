@@ -17,7 +17,7 @@
 
 ## Installation — インストール
 
-- 対象：**Ubuntu 24.04／26.04・x86_64・systemd・KVM・cgroup v2**（24.04の自動判定は未リリース（main））。
+- 対象：**Ubuntu 24.04／26.04・x86_64・systemd・KVM・cgroup v2**（24.04の自動判定はv0.0.9以降）。
 - 実行者：`sudo` が使える通常ユーザー。管理操作はスクリプトが昇格。
 - 配布：GitHub Releasesのビルド済み版。Go・Make・ソース取得は不要。
 - 事前準備：[curl・CA証明書・GitHub CLIを導入](doc/installation.md#2-ツールを準備する)。GitHub CLIは配布物の署名検証に使用。GitHubへのログインは不要。
@@ -27,8 +27,8 @@
 **1. 配置計画を確認し、インストール**
 
 ```bash
-curl -fsSL https://github.com/pacificbelt30/sandbox-oasis/releases/latest/download/install.sh | bash
-curl -fsSL https://github.com/pacificbelt30/sandbox-oasis/releases/latest/download/install.sh | bash -s -- --apply
+curl -fsSL https://github.com/pacificbelt30/sandbox-oaiso/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/pacificbelt30/sandbox-oaiso/releases/latest/download/install.sh | bash -s -- --apply
 ```
 
 - スクリプト自体も実行前に検証する場合：[署名を確認して導入](doc/guides/signed-releases.md#スクリプトも実行前に確認する)。

@@ -11,7 +11,7 @@
 |---|---|
 | 署名 | GitHub OIDC／Sigstore。GitHub CLIが管理する認証局と署名鍵で検証。配布物に付属する鍵を新たに信頼しない |
 | ビルド元 | 3つの実行ファイルのGo build情報を、変更のないcheckoutのcommitと照合 |
-| 作成者 | `pacificbelt30/sandbox-oasis`の`.github/workflows/release.yml`と、選択した`refs/tags/<版>`に限定 |
+| 作成者 | `pacificbelt30/sandbox-oaiso`の`.github/workflows/release.yml`と、選択した`refs/tags/<版>`に限定 |
 | 実行環境 | GitHub管理runner。self-hosted runnerの証跡は拒否 |
 | 対象ファイル | 配布archive、`install.sh`、`SHA256SUMS`、`sbom.cdx.json`を署名付き作成元証跡に結び付ける |
 | 証跡 | `provenance.json`。署名・証明書・透明性の証拠を含む検証用bundle |
@@ -36,23 +36,23 @@
 
 ## スクリプトも実行前に確認する
 
-通常ユーザーで実行します。下のブロックはv0.0.8の署名を確認して、配置計画を表示します。
+通常ユーザーで実行します。下のブロックはv0.0.9の署名を確認して、配置計画を表示します。
 
 ```bash
-export RELEASE_TAG=v0.0.8
+export RELEASE_TAG=v0.0.9
 bash <<'SH'
 set -euo pipefail
 : "${RELEASE_TAG:?先に署名付き配布版のタグをexportしてください}"
 oaiso_install_dir=$(mktemp -d)
 trap 'rm -rf -- "$oaiso_install_dir"' EXIT
-base="https://github.com/pacificbelt30/sandbox-oasis/releases/download/$RELEASE_TAG"
+base="https://github.com/pacificbelt30/sandbox-oaiso/releases/download/$RELEASE_TAG"
 curl -fLsS --proto '=https' --proto-redir '=https' "$base/install.sh" -o "$oaiso_install_dir/install.sh"
 curl -fLsS --proto '=https' --proto-redir '=https' "$base/provenance.json" -o "$oaiso_install_dir/provenance.json"
 gh attestation verify "$oaiso_install_dir/install.sh" \
   --bundle "$oaiso_install_dir/provenance.json" \
-  --repo pacificbelt30/sandbox-oasis \
+  --repo pacificbelt30/sandbox-oaiso \
   --source-ref "refs/tags/$RELEASE_TAG" \
-  --cert-identity "https://github.com/pacificbelt30/sandbox-oasis/.github/workflows/release.yml@refs/tags/$RELEASE_TAG" \
+  --cert-identity "https://github.com/pacificbelt30/sandbox-oaiso/.github/workflows/release.yml@refs/tags/$RELEASE_TAG" \
   --cert-oidc-issuer https://token.actions.githubusercontent.com \
   --deny-self-hosted-runners --hostname github.com
 bash "$oaiso_install_dir/install.sh" --version "$RELEASE_TAG"
@@ -63,6 +63,8 @@ SH
 - 適用：検証するタグを固定したまま、末尾のinstaller呼出しへ`--apply`を追加します。
 - `curl ... | bash`は、最初のスクリプトをHTTPS配布元から信頼して実行する方法です。スクリプト自体の実行前検証には上の手順を使います。
 - `oaiso upgrade`は、取得したinstallerの署名も確認してから実行します。
+
+v0.0.4〜v0.0.8の証跡を手動で検証する場合は、取得先は現行リポジトリのままにし、`--repo`と`--cert-identity`に署名当時の`pacificbelt30/sandbox-oasis`を指定します。
 
 ## 旧版・オフライン・障害
 

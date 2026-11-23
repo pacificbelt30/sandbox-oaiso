@@ -3,7 +3,7 @@
 **日本語** | [English](../en/guides/first-run.md)
 
 - このページはv0.0.4以降の手順です。`oaiso --version`で導入した版を確認してください。
-- 24.04の自動判定は未リリース（main）。以下はUbuntu 24.04／26.04・x86_64・systemd・KVM・cgroup v2があるホスト向けです。[前提条件](../installation.md#1-前提条件)。
+- 24.04の自動判定はv0.0.9以降。以下はUbuntu 24.04／26.04・x86_64・systemd・KVM・cgroup v2があるホスト向けです。[前提条件](../installation.md#1-前提条件)。
 
 このページはAIエージェント向けの導入・認証手順です。AI認証なしで使う場合は[サンドボックスガイド](sandbox-ui.md)（v0.0.8以降）へ進んでください。
 
@@ -12,8 +12,8 @@
 通常ユーザーで計画を表示し、内容を確認して適用します。先に[curl・CA証明書・GitHub CLIを準備](../installation.md#2-ツールを準備する)してください。GitHub CLIは署名検証に使います。
 
 ```bash
-curl -fsSL https://github.com/pacificbelt30/sandbox-oasis/releases/latest/download/install.sh | bash
-curl -fsSL https://github.com/pacificbelt30/sandbox-oasis/releases/latest/download/install.sh | bash -s -- --apply
+curl -fsSL https://github.com/pacificbelt30/sandbox-oaiso/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/pacificbelt30/sandbox-oaiso/releases/latest/download/install.sh | bash -s -- --apply
 ```
 
 - Go・Make・ソース取得は不要。uv・Pythonはスクリプトが準備します。

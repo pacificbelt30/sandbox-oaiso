@@ -2,7 +2,7 @@
 
 ## WSL向け事前確認と導入手順（2026-11-14）
 
-対象：**未リリース（main）**。WSLでは計画時にも専用XFSを検査し、root実行時にKVM API 12で空のVMを作成・解放します。モジュール不足にはWSLの確認先を表示し、setupの自動読込・次回起動用設定に`tun`を追加しました。固定Dragonballの[TAP実装](https://github.com/kata-containers/kata-containers/blob/4.3.0/src/dragonball/crates/dbs_utils/src/net/tap.rs)は`/dev/net/tun`を使用します。
+対象：**v0.0.9収録前のmain**。WSLでは計画時にも専用XFSを検査し、root実行時にKVM API 12で空のVMを作成・解放します。モジュール不足にはWSLの確認先を表示し、setupの自動読込・次回起動用設定に`tun`を追加しました。固定Dragonballの[TAP実装](https://github.com/kata-containers/kata-containers/blob/4.3.0/src/dragonball/crates/dbs_utils/src/net/tap.rs)は`/dev/net/tun`を使用します。
 
 | 範囲 | 確認結果 |
 |---|---|
@@ -18,7 +18,7 @@
 
 ## Ubuntu 24.04の自動判定（2026-11-14）
 
-対象：**未リリース（main）**。自動セットアップにUbuntu 24.04を追加し、24.04／26.04の検出結果を計画に表示します。systemd・KVM・cgroup v2・非rootのoperator・専用XFSの条件は維持します。
+対象：**v0.0.9収録前のmain**。自動セットアップにUbuntu 24.04を追加し、24.04／26.04の検出結果を計画に表示します。systemd・KVM・cgroup v2・非rootのoperator・専用XFSの条件は維持します。
 
 | 範囲 | 確認結果 |
 |---|---|
@@ -1017,7 +1017,7 @@ uv run --no-project --no-config --managed-python --python 3.12 \
 - 既存の通常CIはroot権限を使わない設定生成・配置・復旧の単体テストだけを実行します。
 
 - `deploy/kata/Dockerfile.verify` はsystemdとOS依存パッケージを準備します。
-- Ubuntuは既定で26.04です。24.04を検証するときは、下のノードイメージのビルドに `--build-arg UBUNTU_VERSION=24.04` を追加します（24.04の自動判定は未リリース（main））。外側ホストのカーネルとKVMを使うため、24.04固有のカーネルの確認とは分けます。
+- Ubuntuは既定で26.04です。24.04を検証するときは、下のノードイメージのビルドに `--build-arg UBUNTU_VERSION=24.04` を追加します（24.04の自動判定はv0.0.9以降）。外側ホストのカーネルとKVMを使うため、24.04固有のカーネルの確認とは分けます。
 - `setup` 本体が固定配布物を展開して、専用サービスを新規導入します。
 - 内部ノードへホストPID、ホストDockerソケット、実認証情報は渡しません。既定は外部ネットワークも切断します。
 - containerdのデータは、イメージ展開に必要なwhiteoutを扱える専用ボリュームへ配置します。

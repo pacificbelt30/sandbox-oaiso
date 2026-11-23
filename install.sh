@@ -73,7 +73,8 @@ import tempfile
 import urllib.parse
 import urllib.request
 
-REPOSITORY = 'pacificbelt30/sandbox-oasis'
+REPOSITORY = 'pacificbelt30/sandbox-oaiso'
+LEGACY_SIGNED_TAGS = {'v0.0.4', 'v0.0.5', 'v0.0.6', 'v0.0.7', 'v0.0.8'}
 DEFAULT_VERSION = None  # release packaging sets this value
 ARCHIVE = 'oaiso-linux-amd64.tar.gz'
 FILES = {'oaiso', 'codex-dock-worker-guard', 'codex-dock-io-logger'}
@@ -146,10 +147,11 @@ def verify_attestation(artifact, bundle, version):
     verifier = shutil.which('gh')
     if not verifier:
         raise ValueError('signed release verification requires GitHub CLI (gh): https://github.com/cli/cli/blob/trunk/docs/install_linux.md')
+    publisher = 'pacificbelt30/sandbox-oasis' if version in LEGACY_SIGNED_TAGS else REPOSITORY
     subprocess.run([verifier, 'attestation', 'verify', str(artifact), '--bundle', str(bundle),
-                    '--repo', REPOSITORY,
+                    '--repo', publisher,
                     '--source-ref', 'refs/tags/' + version,
-                    '--cert-identity', 'https://github.com/' + REPOSITORY + '/.github/workflows/release.yml@refs/tags/' + version,
+                    '--cert-identity', 'https://github.com/' + publisher + '/.github/workflows/release.yml@refs/tags/' + version,
                     '--cert-oidc-issuer', 'https://token.actions.githubusercontent.com',
                     '--deny-self-hosted-runners', '--hostname', 'github.com'],
                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)

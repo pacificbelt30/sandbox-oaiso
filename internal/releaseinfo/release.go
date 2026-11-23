@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const Repository = "pacificbelt30/sandbox-oasis"
+const Repository = "pacificbelt30/sandbox-oaiso"
 
 var releaseTag = regexp.MustCompile(`^v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?$`)
 

@@ -43,6 +43,17 @@ func TestAttestationEnforcesPublisherWorkflowTagAndIssuer(t *testing.T) {
 	if selectors != 1 {
 		t.Fatalf("GitHub CLI needs exactly one signer selector; got %d", selectors)
 	}
+	if err := verifyAttestation(context.Background(), binary, "artifact", "bundle", "v0.0.8"); err != nil {
+		t.Fatal(err)
+	}
+	legacyArgs, err := os.ReadFile(args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(legacyArgs), "--repo\npacificbelt30/sandbox-oasis\n") ||
+		!strings.Contains(string(legacyArgs), "--cert-identity\nhttps://github.com/pacificbelt30/sandbox-oasis/.github/workflows/release.yml@refs/tags/v0.0.8\n") {
+		t.Fatal("published v0.0.8 must use its original signer")
+	}
 	if err = os.WriteFile(binary, []byte("#!/bin/sh\nexit 1\n"), 0700); err != nil {
 		t.Fatal(err)
 	}

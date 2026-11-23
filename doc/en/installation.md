@@ -15,10 +15,10 @@
 
 Before updating, back up data, remove all VMs including stopped ones, then stop and remove proxies. AI-authenticated workers need the proxy available for token revocation during deletion. Stopping alone is insufficient. Save rootfs checkpoints and private database backups separately and restore them into new VMs. Read the [update and recovery requirements](../setup.md#更新する) (Japanese) first.
 
-- These instructions install the signed prebuilt distribution (v0.0.8).
+- These instructions install the signed prebuilt distribution (v0.0.9).
 - For the complete flow, follow [installation through first startup](guides/first-run.md).
 - The `releases/latest` commands below install the published release.
-- Ubuntu 24.04 detection: unreleased (main). The published v0.0.8 installer supports only 26.04. For 24.04, [build a bundle from the supporting source](../setup.md#ビルド済みバンドルとは) (Japanese).
+- Ubuntu 24.04 detection is available from v0.0.9. To update from v0.0.8 or earlier, download the release installer from this page. The older CLI’s `upgrade` command uses the previous repository name.
 
 ## 1. Requirements
 
@@ -68,15 +68,15 @@ SH
 **Run from any directory; no source checkout is required.**
 
 ```bash
-curl -fsSL https://github.com/pacificbelt30/sandbox-oasis/releases/latest/download/install.sh | bash
-curl -fsSL https://github.com/pacificbelt30/sandbox-oasis/releases/latest/download/install.sh | bash -s -- --apply
+curl -fsSL https://github.com/pacificbelt30/sandbox-oaiso/releases/latest/download/install.sh | bash
+curl -fsSL https://github.com/pacificbelt30/sandbox-oaiso/releases/latest/download/install.sh | bash -s -- --apply
 ```
 
 **Example plan output (excerpt)**
 
 ```text
 Plan: verified Ubuntu 26.04 amd64 node; Kata 4.3.0 / Dragonball / containerd 2.4.2 / BuildKit 0.34.0 / runc 1.4.3
-Bundle: /tmp/oaiso-release-<id>/bundle (version v0.0.8); operator: user; cache: /var/cache/codex-dock-setup; offline: no
+Bundle: /tmp/oaiso-release-<id>/bundle (version v0.0.9); operator: user; cache: /var/cache/codex-dock-setup; offline: no
 ```
 
 - Versions, paths and account names are examples and vary by installation and release.
@@ -87,7 +87,7 @@ Bundle: /tmp/oaiso-release-<id>/bundle (version v0.0.8); operator: user; cache: 
 | Command or option | Behavior |
 |---|---|
 | No options | Download and verify the matching release binaries, then display the plan |
-| `--version v0.0.8` | Download a specific release |
+| `--version v0.0.9` | Download a specific release |
 | `--apply` | Apply through `sudo` after the plan succeeds, forwarding the selected Python’s absolute path |
 | No operator option | Register the invoking normal user |
 | `--operator USER` | Register another existing normal user; required when invoking the script as root |
@@ -105,13 +105,13 @@ Bundle: /tmp/oaiso-release-<id>/bundle (version v0.0.8); operator: user; cache: 
 
 ### Download and review a pinned release
 
-**Example for v0.0.8. Inspect the saved script, then use the same file for planning and installation.**
+**Example for v0.0.9. Inspect the saved script, then use the same file for planning and installation.**
 
 ```bash
-curl -fsSL -o install.sh https://github.com/pacificbelt30/sandbox-oasis/releases/download/v0.0.8/install.sh
+curl -fsSL -o install.sh https://github.com/pacificbelt30/sandbox-oaiso/releases/download/v0.0.9/install.sh
 less install.sh
-bash install.sh --version v0.0.8
-bash install.sh --version v0.0.8 --apply
+bash install.sh --version v0.0.9
+bash install.sh --version v0.0.9 --apply
 ```
 
 ## 4. Log in again and verify
