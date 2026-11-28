@@ -26,6 +26,8 @@ type Plan struct {
 	Skipped  []Skipped
 }
 
+const copyBufferSize = 32 << 10
+
 func directory(source string) (*os.File, error) {
 	p, err := filepath.Abs(source)
 	if err != nil {
@@ -48,31 +50,31 @@ func directory(source string) (*os.File, error) {
 	}
 	return os.NewFile(uintptr(fd), p), nil
 }
-func regularAt(parent *os.File, name string) (*os.File, error) {
+func regularAt(parent *os.File, name string) (*os.File, os.FileInfo, error) {
 	fd, err := unix.Openat(int(parent.Fd()), name, unix.O_RDONLY|unix.O_NOFOLLOW|unix.O_NONBLOCK|unix.O_CLOEXEC, 0)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	f := os.NewFile(uintptr(fd), name)
 	st, err := f.Stat()
 	if err != nil {
 		_ = f.Close()
-		return nil, err
+		return nil, nil, err
 	}
 	stat, ok := st.Sys().(*syscall.Stat_t)
 	if !ok || !st.Mode().IsRegular() || stat.Nlink != 1 {
 		_ = f.Close()
-		return nil, fmt.Errorf("source must be a regular file with no hardlinks")
+		return nil, nil, fmt.Errorf("source must be a regular file with no hardlinks")
 	}
-	return f, nil
+	return f, st, nil
 }
-func openRelative(source, rel string) (*os.File, error) {
+func openRelative(source, rel string) (*os.File, os.FileInfo, error) {
 	if err := managedworkspace.FilePath(rel); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	parent, err := directory(filepath.Join(source, filepath.Dir(rel)))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer func() { _ = parent.Close() }()
 	return regularAt(parent, filepath.Base(rel))
@@ -92,6 +94,9 @@ func Prepare(ctx context.Context, source string, limit int64) (Plan, error) {
 	}
 	defer func() { _ = root.Close() }()
 	count := 0
+	hash := sha256.New()
+	var buffer []byte
+	var digest [sha256.Size]byte
 	var walk func(*os.File, string, int) error
 	walk = func(dir *os.File, prefix string, depth int) error {
 		if depth > 64 {
@@ -144,23 +149,21 @@ func Prepare(ctx context.Context, source string, limit int64) (Plan, error) {
 					}
 					continue
 				}
-				file, e := regularAt(dir, entry.Name())
+				file, st, e := regularAt(dir, entry.Name())
 				if e != nil {
 					plan.Skipped = append(plan.Skipped, Skipped{rel, "special file/hardlink"})
 					continue
-				}
-				st, e := file.Stat()
-				if e != nil {
-					_ = file.Close()
-					return e
 				}
 				if st.Size() > managedworkspace.MaxFileBytes {
 					_ = file.Close()
 					plan.Skipped = append(plan.Skipped, Skipped{rel, "file exceeds 64 MiB"})
 					continue
 				}
-				hash := sha256.New()
-				n, e := io.Copy(hash, io.LimitReader(&contextReader{ctx, file}, managedworkspace.MaxFileBytes+1))
+				if buffer == nil {
+					buffer = make([]byte, copyBufferSize)
+				}
+				hash.Reset()
+				n, e := io.CopyBuffer(hash, io.LimitReader(&contextReader{ctx, file}, managedworkspace.MaxFileBytes+1), buffer)
 				_ = file.Close()
 				if e != nil {
 					return e
@@ -172,7 +175,7 @@ func Prepare(ctx context.Context, source string, limit int64) (Plan, error) {
 				if st.Mode().Perm()&0111 != 0 {
 					mode = 0755
 				}
-				plan.Manifest.Files = append(plan.Manifest.Files, managedworkspace.File{Path: rel, Bytes: n, Mode: mode, SHA256: hex.EncodeToString(hash.Sum(nil))})
+				plan.Manifest.Files = append(plan.Manifest.Files, managedworkspace.File{Path: rel, Bytes: n, Mode: mode, SHA256: hex.EncodeToString(hash.Sum(digest[:0]))})
 				plan.Manifest.Bytes += n
 				if len(plan.Manifest.Files) > managedworkspace.MaxFiles || plan.Manifest.Bytes > limit {
 					return fmt.Errorf("selected files exceed workspace seed byte/file limit; choose a smaller source")
@@ -221,13 +224,17 @@ func (p Plan) Write(ctx context.Context, out io.Writer) error {
 	if _, err = writer.Write(data); err != nil {
 		return err
 	}
+	buffer := make([]byte, min(copyBufferSize, max(1, p.Manifest.Bytes)))
+	hash := sha256.New()
+	destination := io.MultiWriter(writer, hash)
+	var digest [sha256.Size]byte
+	var encoded [sha256.Size * 2]byte
 	for _, entry := range p.Manifest.Files {
-		file, err := openRelative(p.Source, entry.Path)
+		file, st, err := openRelative(p.Source, entry.Path)
 		if err != nil {
 			return err
 		}
-		st, err := file.Stat()
-		if err != nil || st.Size() != entry.Bytes {
+		if st.Size() != entry.Bytes {
 			_ = file.Close()
 			return fmt.Errorf("source changed after review: %s", entry.Path)
 		}
@@ -235,13 +242,17 @@ func (p Plan) Write(ctx context.Context, out io.Writer) error {
 			_ = file.Close()
 			return err
 		}
-		hash := sha256.New()
-		_, err = io.CopyN(io.MultiWriter(writer, hash), &contextReader{ctx, file}, entry.Bytes)
+		hash.Reset()
+		n, err := io.CopyBuffer(destination, io.LimitReader(&contextReader{ctx, file}, entry.Bytes), buffer)
 		_ = file.Close()
-		if err != nil {
-			return err
+		if n != entry.Bytes {
+			if err != nil {
+				return err
+			}
+			return io.EOF
 		}
-		if hex.EncodeToString(hash.Sum(nil)) != entry.SHA256 {
+		hex.Encode(encoded[:], hash.Sum(digest[:0]))
+		if string(encoded[:]) != entry.SHA256 {
 			return fmt.Errorf("source changed after review: %s", entry.Path)
 		}
 	}

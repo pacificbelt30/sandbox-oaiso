@@ -7,6 +7,28 @@
 
 ## How the optimizations work
 
+### Managed workspace copies and task storage
+
+- Available on **unreleased main**. Copy review and transfer read each open file's metadata once and reuse a read buffer within each operation. Transfer still reopens each file and checks it against the reviewed SHA-256.
+- Task updates check the file revision under the lock and use the decoded data for that revision.
+- The baseline was `d66bd6d`. Measurements used a Core i5-8500, Linux amd64, Go 1.27.3, GOMAXPROCS=4 and tmpfs. Results are medians of six 300ms runs per condition with the order varied. Archive output went to `io.Discard`.
+
+| Operation | Before | After | Time reduction |
+|---|---:|---:|---:|
+| Copy review, 512 files of 1 KiB | 10.17ms | 7.05ms | 30.7% |
+| Archive creation, the same 512 files | 15.24ms | 14.55ms | 4.5% |
+| Task update, 512 records | 10.96ms | 8.40ms | 23.4% |
+
+- Copy review allocations fell from about 17.26MiB to 0.83MiB per operation.
+- On ext4, review for 512 files fell from 10.35ms to 7.34ms (median of four runs). The task update median moved from 75.14ms to 71.06ms across 12 runs with substantial overlap in the observed ranges.
+
+Run the benchmarks from the repository root. When comparing versions, use the same benchmarks and alternate their order.
+
+```bash
+GOMAXPROCS=4 go test -p 1 ./internal/workspacecopy ./internal/taskboard -run '^$' \
+  -bench '^(BenchmarkWorkspaceCopy|BenchmarkTaskStoreUpdate)$' -benchmem -benchtime=300ms -count=6
+```
+
 ### Dashboard refresh and checkpoint catalogs
 
 - Scope: **main before v0.0.8**, measured on 2026-11-03.

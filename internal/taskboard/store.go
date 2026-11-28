@@ -121,20 +121,16 @@ func (s Store) Get(id string) (Task, error) {
 }
 func (s Store) change(fn func(*boardFile) error) error {
 	for tries := 0; tries < 8; tries++ {
-		_, raw, e := s.read()
+		b, raw, e := s.read()
 		if errors.Is(e, privatefile.ErrChanged) {
 			continue
 		}
 		if e != nil {
 			return e
 		}
-		e = privatefile.Update(s.path(), privatefile.Revision(raw), func(data []byte) ([]byte, error) {
-			b := boardFile{Version: 1, Tasks: []Task{}}
-			if len(data) > 0 {
-				if e := json.Unmarshal(data, &b); e != nil {
-					return nil, e
-				}
-			}
+		// Update calls the transform only after the locked file matches the
+		// revision of the board we already decoded and validated.
+		e = privatefile.Update(s.path(), privatefile.Revision(raw), func([]byte) ([]byte, error) {
 			if e := fn(&b); e != nil {
 				return nil, e
 			}

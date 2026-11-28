@@ -16,7 +16,12 @@ import (
 
 func TestCurrentFilesCopyExcludesSecretsLinksAndCaches(t *testing.T) {
 	root := t.TempDir()
-	for name, data := range map[string]string{"tracked": "uncommitted", "untracked": "present", "日本語.txt": "[red]literal", ".env": "secret", ".git/config": "git", "node_modules/pkg": "cache"} {
+	files := map[string]string{
+		"tracked": "uncommitted", "untracked": "present", "日本語.txt": "[red]literal",
+		"large.txt": strings.Repeat("workspace data\n", 8192), "empty.txt": "",
+		".env": "secret", ".git/config": "git", "node_modules/pkg": "cache",
+	}
+	for name, data := range files {
 		path := filepath.Join(root, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 			t.Fatal(err)
@@ -35,7 +40,7 @@ func TestCurrentFilesCopyExcludesSecretsLinksAndCaches(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(plan.Manifest.Files) != 2 || len(plan.Skipped) != 6 {
+	if len(plan.Manifest.Files) != 4 || len(plan.Skipped) != 6 {
 		t.Fatal(plan)
 	}
 	var archive bytes.Buffer
@@ -53,7 +58,7 @@ func TestCurrentFilesCopyExcludesSecretsLinksAndCaches(t *testing.T) {
 	}
 	for _, f := range manifest.Files {
 		got, e := os.ReadFile(filepath.Join(target, f.Path))
-		if e != nil || len(got) != int(f.Bytes) {
+		if e != nil || string(got) != files[f.Path] {
 			t.Fatal(f, e)
 		}
 	}
